@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Email Verification</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: Arial, sans-serif;">
+    <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa;">
+      <tr>
+        <td align="center">
+          <table cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; margin-top: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+            <!-- Header -->
+            <tr>
+              <td align="center" style="background-color: #1b5e20; padding: 20px;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Welcome to City Bus Transit</h1>
+              </td>
+            </tr>
+            <!-- Body -->
+            <tr>
+              <td style="padding: 30px; color: #333333;">
+                <h2 style="color: #1b5e20;">Verify Your Email Address</h2>
+                <p style="font-size: 16px; line-height: 1.5;">
+                  Thank you for signing up! To get started, please verify your email address by clicking the button below.
+                </p>
+                <p style="font-size: 16px; line-height: 1.5;">
+                  This will expire in one hour.
+                </p>
+                <p style="text-align: center; margin: 30px 0;">
+                  <a href="{{VERIFICATION_LINK}}" style="background-color: #fdd835; color: #1b5e20; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block;">
+                    Verify Email
+                  </a>
+                </p>
+                <p style="font-size: 14px; color: #555;">
+                  If the button doesn't work, copy and paste the link below into your browser:
+                </p>
+                <p style="font-size: 14px; word-break: break-all; color: #00695c;">
+                  {{VERIFICATION_LINK}}
+                </p>
+              </td>
+            </tr>
+            <!-- Footer -->
+            <tr>
+              <td align="center" style="background-color: #e8f5e9; padding: 20px; font-size: 12px; color: #777;">
+                &copy; {{current_year}} City Bus Transit. All rights reserved.
+              </td>
+            </tr>
+          </table>
+          <p style="font-size: 12px; color: #999; margin-top: 20px;">
+            You received this email because you signed up on our platform.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
