@@ -65,4 +65,35 @@ export async function checkRateLimit(ip: string) {
   }
 }
 
+export async function verifyOtp(userId: string, otp: string) {
+  const record = await prisma.otp.findFirst({
+    where: { id: userId },
+    orderBy: { createdAt: "desc" },
+  })
 
+
+  if (!record) throw new Error("OTP not found")
+
+  if (record.expiresAt < new Date()) {
+    throw new Error("OTP expired")
+  }
+
+  if (record.attempts >= MAX_OTP_ATTEMPTS) {
+    throw new Error("Too many attempts. Request a new OTP.")
+  }
+
+  const isValid = await bcrypt.compare(otp, record.codeHash)
+
+  await prisma.otp.update({
+    where: { id: record.id },
+    data: { attempts: { increment: 1 } },
+  })
+
+  if (!isValid) throw new Error("Invalid OTP")
+
+
+  // Success → cleanup: Delete that otp.
+  await prisma.otp.delete({ where: { id: record.id } })
+
+  return true
+}

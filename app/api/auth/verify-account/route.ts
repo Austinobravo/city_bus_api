@@ -4,6 +4,7 @@ import { emojiRegex, normalizePhone, validateForEmptySpaces } from "@/lib/global
 import z from "zod";
 import bcrypt from "bcryptjs";
 import { UserWhereInput } from "@/lib/generated/prisma/models";
+import { verifyOtp } from "@/lib/helpers";
 
 
 const VerifyEmailOrPhoneFormSchema = z
@@ -32,9 +33,9 @@ const VerifyEmailOrPhoneFormSchema = z
 
 /**
  * @swagger
- * /api/auth/verify-email-or-phone:
- *   get:
- *     summary: Email Or Phone verification by OTP
+ * /api/auth/verify-account:
+ *   post:
+ *     summary: Verify an account
  *     tags:
  *       - Auth
 *     requestBody:
@@ -67,41 +68,6 @@ const VerifyEmailOrPhoneFormSchema = z
  *         description: Invalid token
  */
 
-
-const MAX_OTP_ATTEMPTS = 5
-
-async function verifyOtp(userId: string, otp: string) {
-  const record = await prisma.otp.findFirst({
-    where: { id: userId },
-    orderBy: { createdAt: "desc" },
-  })
-
-
-  if (!record) throw new Error("OTP not found")
-
-  if (record.expiresAt < new Date()) {
-    throw new Error("OTP expired")
-  }
-
-  if (record.attempts >= MAX_OTP_ATTEMPTS) {
-    throw new Error("Too many attempts. Request a new OTP.")
-  }
-
-  const isValid = await bcrypt.compare(otp, record.codeHash)
-
-  await prisma.otp.update({
-    where: { id: record.id },
-    data: { attempts: { increment: 1 } },
-  })
-
-  if (!isValid) throw new Error("Invalid OTP")
-
-
-  // Success → cleanup
-  await prisma.otp.delete({ where: { id: record.id } })
-
-  return true
-}
 
 
 export const POST = async (req: Request) => {
@@ -141,12 +107,12 @@ export const POST = async (req: Request) => {
     if (!existingUser) {
       return NextResponse.json(
         { message: "User does not exist." },
-        { status: 409 }
+        { status: 400 }
       )
     }
   try {
 
-    if(existingUser?.status === "ACTIVE"){
+    if(existingUser.status === "ACTIVE"){
         return NextResponse.json({ message: "Already verified" }, { status: 400 }); 
     }
 
@@ -167,7 +133,7 @@ export const POST = async (req: Request) => {
 
     return NextResponse.json({message: `Verified successfully`}, {status: 200});
   } catch (err) {
-    console.log("error in verify email and phoneendpoint", err)
+    console.log("Error in verify account endpoint", err)
     return NextResponse.json({ message: "Token expired or invalid", error: err }, { status: 400 });
   }
 };

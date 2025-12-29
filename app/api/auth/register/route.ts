@@ -1,11 +1,12 @@
 import { sendEmail } from "@/emails/mailer";
-import { emojiRegex } from "@/lib/globals";
+import { emojiRegex, normalizePhone } from "@/lib/globals";
 
 import {
   BASE_URL,
   createVerificationToken,
   validateForEmptySpaces,
 } from "@/lib/globals";
+import { createOtp } from "@/lib/helpers";
 import prisma from "@/prisma/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -34,13 +35,14 @@ const CreateUserSchema = z
       }),
     phone: z
       .string()
+      .optional()
       .refine((value) => !value || validateForEmptySpaces(value), {
         message: "No empty spaces",
       })
-      .refine((val) => /^\d+(\.\d{1,2})?$/.test(val), {
+      .refine((val) => !val || /^\d+(\.\d{1,2})?$/.test(val), {
         message: "Phone must be a valid number",
       })
-      .refine((value) => !value.match(emojiRegex), {
+      .refine((value) => !value || !value.match(emojiRegex), {
         message: "No emoji's alllowed.",
       }),
     email: z
@@ -62,15 +64,6 @@ const CreateUserSchema = z
         message: "No emoji's alllowed.",
       }),
     password: z
-      .string()
-      .min(1, { message: "This field is mandatory" })
-      .refine((value) => !value || validateForEmptySpaces(value), {
-        message: "No empty spaces",
-      })
-      .refine((value) => !value.match(emojiRegex), {
-        message: "No emoji's alllowed.",
-      }),
-    callbackUrl: z
       .string()
       .min(1, { message: "This field is mandatory" })
       .refine((value) => !value || validateForEmptySpaces(value), {
@@ -102,7 +95,6 @@ const CreateUserSchema = z
  *             required:
  *               - email
  *               - password
- *               - username
  *             properties:
  *               email:
  *                 type: string
@@ -110,8 +102,6 @@ const CreateUserSchema = z
  *               firstName:
  *                 type: string
  *               lastName:
- *                 type: string
- *               callbackUrl:
  *                 type: string
  *               password:
  *                 type: string
@@ -131,6 +121,8 @@ const CreateUserSchema = z
  *                   type: string
  *                 firstName:
  *                   type: string
+ *                 lastName:
+ *                   type: string
  *                 role:
  *                   type: string
  *       400:
@@ -149,8 +141,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, firstName, lastName, password, callbackUrl, phone } = parsed.data;
+    const { email:gottenEmail, firstName, lastName, password, phone:gottenPhone } = parsed.data;
 
+
+    const phone = gottenPhone ? normalizePhone(gottenPhone as string) : null
+    const email = gottenEmail.toLocaleLowerCase()
+   
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where:{
@@ -181,6 +177,7 @@ export async function POST(req: Request) {
         email,
         firstName,
         lastName,
+        phone,
         passwordHash: hashedPassword,
         role: "PASSENGER"
       },
@@ -188,26 +185,25 @@ export async function POST(req: Request) {
         id: true,
         email: true,
         firstName: true,
-        // role: true,
+        lastName: true,
+        role: true,
       },
     });
 
-    const token = createVerificationToken(email);
-    const VERIFICATION_LINK = `${callbackUrl}?token=${token}`;
-
-    await prisma.user.update({
-      where: { id: user?.id },
-      data: { verificationLink: VERIFICATION_LINK },
-    });
-
-
+    const otp = await createOtp(user.id);
     const current_year = new Date().getFullYear()
+    const name = `${firstName} ${lastName}`
+
 
     await sendEmail({
       to: email,
       subject: "You're In! Welcome to CBT 🎉",
       template: "signup-verification",
-      data: { VERIFICATION_LINK, current_year },
+      data: { 
+        name,
+        otp, 
+        current_year 
+      },
     });
 
     return NextResponse.json(

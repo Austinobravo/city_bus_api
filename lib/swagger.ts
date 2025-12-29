@@ -11,7 +11,7 @@ export function getApiDocs() {
       },
       servers: [
         {
-          url: "https://",
+          url: "https://city-bus-api.vercel.app",
           description: "Production server",
         },
         {

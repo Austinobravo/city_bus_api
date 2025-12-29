@@ -2,14 +2,25 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/prisma/prisma";
 import jwt from "jsonwebtoken";
-import { BASE_URL, emojiRegex, validateForEmptySpaces } from "@/lib/globals";
+import { BASE_URL, emojiRegex, normalizePhone, validateForEmptySpaces } from "@/lib/globals";
 import { sendEmail } from "@/emails/mailer";
 import z from "zod";
+import { UserWhereInput } from "@/lib/generated/prisma/models";
+import { verifyOtp } from "@/lib/helpers";
 
 
 const ResetForgotPasswordSchema = z
   .object({
     newPassword: z
+      .string()
+      .min(1, { message: "This field is mandatory" })
+      .refine((value) => validateForEmptySpaces(value), {
+        message: "No empty spaces",
+      })
+      .refine((value) => !value.match(emojiRegex), {
+        message: "No emoji's allowed.",
+      }),
+    emailOrPhone: z
       .string()
       .min(1, { message: "This field is mandatory" })
       .refine((value) => validateForEmptySpaces(value), {
@@ -27,55 +38,14 @@ const ResetForgotPasswordSchema = z
       .refine((value) => !value.match(emojiRegex), {
         message: "No emoji's allowed.",
       }),
-    token: z.string().min(1, { message: "Token is required" }),
+    otp: z.string().min(1, { message: "Token is required" }),
   })
   .refine((data) => data.newPassword === data.confirmNewPassword, {
     message: "Passwords don't match",
     path: ["confirmNewPassword"],
   });
 
-/**
- * @swagger
- * /api/auth/reset-password:
- *   get:
- *     summary: Check token validity
- *     tags:
- *       - Auth
- *     parameters:
- *       - in: query
- *         name: token
- *         schema:
- *           type: string
- *         required: true
- *         description: Token for password reset
- *     responses:
- *       200:
- *         description: Token is valid
- *       400:
- *         description: Invalid or expired token
- */
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  console.log("received token", token);
 
-  if (!token) {
-    return NextResponse.json({ error: "Missing token" }, { status: 400 });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      email: string;
-    };
-
-    return NextResponse.json({ message: "Valid token", email: decoded.email });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Invalid or expired token" },
-      { status: 400 }
-    );
-  }
-}
 
 /**
  * @swagger
@@ -91,11 +61,14 @@ export async function GET(req: Request) {
  *           schema:
  *             type: object
  *             required:
- *               - token
+ *               - emailOrPhone
+ *               - otp
  *               - newPassword
  *               - confirmNewPassword
  *             properties:
- *               token:
+ *               emailOrPhone:
+ *                 type: string
+ *               otp:
  *                 type: string
  *               newPassword:
  *                 type: string
@@ -122,53 +95,78 @@ export async function POST(req: Request) {
   });
 
   const body = await req.json();
-  console.log("[POST] Reset Password - Request Body:", body); // Log full request input
 
   const parsed = ResetForgotPasswordSchema.safeParse(body);
   if (!parsed.success) {
-    console.error("[POST] Zod Validation Failed:", parsed.error.format());
+    console.error("[POST] Zod Validation Failed:", parsed.error.message);
     return NextResponse.json(
-      { message: "Invalid input", errors: parsed.error.format() },
+      { message: "Invalid input", errors: parsed.error.message },
       { status: 400 }
     );
   }
 
-  const { token, newPassword } = parsed.data;
-  console.log("[POST] Token extracted:", token);
+  const { otp, newPassword, emailOrPhone } = parsed.data;
 
+  
+  
+    const isEmail = z.email().safeParse(emailOrPhone).success
+    const phone = !isEmail ? normalizePhone(emailOrPhone) : null
+
+    if (!isEmail && !phone) {
+    return NextResponse.json(
+        { message: "Invalid phone number format" },
+        { status: 400 }
+    )
+    }
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+    where: {
+        OR: [
+        isEmail ? { email: emailOrPhone } : undefined,
+        phone ? { phone } : undefined,
+        ].filter(Boolean) as UserWhereInput[],
+    },
+    })
+
+    if (!existingUser) {
+    return NextResponse.json(
+        { message: "User does not exist." },
+        { status: 400 }
+    )
+    }
+
+    const isUserVerified = await verifyOtp(existingUser.id, otp)
+
+    if(!isUserVerified) {
+        return NextResponse.json({ message: "Unable to verify code" }, { status: 400 }); 
+        }
+    
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      email: string;
-    };
-    console.log("[POST] Token decoded. Email:", decoded.email);
-
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     console.log("[POST] Password hashed");
 
     const user = await prisma.user.update({
-      where: { email: decoded.email },
+      where: { id: existingUser.id },
       data: {
         passwordHash: hashedPassword,
         verificationLink: null,
       },
     });
 
-    console.log("[POST] User updated:", user?.email);
-
-    await sendEmail({
-      to: decoded.email,
-      subject: "Password Reset Successful 🎉",
-      template: "password-reset-successful",
-      data: {
-        name: `${user.firstName} ${user.lastName}`,
-        loginLink: `https://smegear.agency/login`,
-        reset_time,
-        ip_address: ip,
-        year: new Date().getFullYear(),
-      },
-    });
-
-    console.log("[POST] Success email sent to:", decoded.email);
+    if(isEmail){
+        await sendEmail({
+          to: user.email as string,
+          subject: "Password Reset Successful 🎉",
+          template: "password-reset-successful",
+          data: {
+            name: `${user.firstName} ${user.lastName}`,
+            reset_time,
+            ip_address: ip,
+            support_link: "https://citybustransit.com/contact",
+            current_year: new Date().getFullYear(),
+          },
+        });
+    }
 
     return NextResponse.json({ message: "Password reset successful" });
   } catch (err) {

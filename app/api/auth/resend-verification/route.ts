@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "@/emails/mailer";
-import { BASE_URL, createVerificationToken } from "@/lib/globals";
+import { BASE_URL, createVerificationToken, normalizePhone } from "@/lib/globals";
+import { UserWhereInput } from "@/lib/generated/prisma/models";
+import { sendSmsOtp } from "@/lib/twilio";
+import { createOtp } from "@/lib/helpers";
+import z from "zod";
 
 /**
  * @swagger
  * /api/auth/resend-verification:
  *   post:
- *     summary: Resend verification email
+ *     summary: Resend verification message
  *     tags:
  *       - Auth
  *     requestBody:
@@ -18,54 +22,78 @@ import { BASE_URL, createVerificationToken } from "@/lib/globals";
  *           schema:
  *             type: object
  *             required:
- *               - email
+ *               - emailOrPhone
  *             properties:
- *               email:
+ *               emailOrPhone:
  *                 type: string
  *     responses:
  *       200:
- *         description: Verification email sent
+ *         description: Verification message sent
  *       400:
  *         description: Email not found or already verified
  */
 
 export const POST = async (req: Request) => {
   try {
-    const { email } = await req.json();
+    let { emailOrPhone:gottenData } = await req.json();
+   
+    // console.log("emailOrPhone", emailOrPhone)
+    console.log("gottenData", gottenData)
+    const isEmail = z.email().safeParse(gottenData).success
+    const email = isEmail ? gottenData.toLocaleLowerCase() : gottenData
+    const phone = !isEmail ? normalizePhone(gottenData) : null
 
-    if (!email) {
-      return NextResponse.json({ message: "Email is required" }, { status: 400 });
+
+    if (!isEmail && !phone) {
+        console.log("isEmail", isEmail)
+        console.log("email", email)
+        console.log("phone", phone)
+    return NextResponse.json(
+        { message: "Invalid phone number format" },
+        { status: 400 }
+    )
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+
+      const user = await prisma.user.findFirst({
+        where: { 
+          OR: [
+              isEmail ? { email: email } : undefined,
+              phone ? { phone } : undefined,
+            ].filter(Boolean) as UserWhereInput[], 
+         },
+      });
 
     if (!user) {
-      return NextResponse.json({ message: "Email not found" }, { status: 404 });
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     if (user.status === "ACTIVE") {
-      return NextResponse.json({ message: "Email is already verified" }, { status: 400 });
+      return NextResponse.json({ message: "Account is already verified" }, { status: 400 });
     }
 
 
-    const token = createVerificationToken(email);
-    const VERIFICATION_LINK = `${BASE_URL}/verify-email?token=${token}`;
-    
+    const otp = await createOtp(user.id);
+    const current_year = new Date().getFullYear()
+    const name = `${user.firstName} ${user.lastName}`
 
-    await prisma.user.update({
-      where: { id: user?.id },
-      data: { verificationLink: VERIFICATION_LINK },
-    });
 
-    
-    await sendEmail({
-      to: email,
-      subject: "You're In! Welcome to SmeGear 🎉",
-      template: "signup-verification",
-      data: { VERIFICATION_LINK },
-    });
+    if (isEmail) {
+      await sendEmail({
+        to: user.email as string,
+        subject: "You're In! Welcome to CBT 🎉",
+        template: "signup-verification",
+        data: {
+          name: name,
+          otp: otp,
+          current_year
+        },
+      })
+    } else if (phone) {
+      await sendSmsOtp(phone, otp)
+    }
 
-    return NextResponse.json({ message: "Verification email sent" }, { status: 200 });
+    return NextResponse.json({ message: "Verification message sent" }, { status: 200 });
 
   } catch (error) {
     console.error("Error resending verification:", error);

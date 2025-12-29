@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
 import { sendEmail } from "@/emails/mailer";
-import { BASE_URL, createVerificationToken } from "@/lib/globals";
+import { BASE_URL, createVerificationToken, normalizePhone } from "@/lib/globals";
+import { createOtp } from "@/lib/helpers";
+import z from "zod";
+import { UserWhereInput } from "@/lib/generated/prisma/models";
+import { sendSmsOtp } from "@/lib/twilio";
 
 /**
  * @swagger
@@ -17,11 +21,10 @@ import { BASE_URL, createVerificationToken } from "@/lib/globals";
  *           schema:
  *             type: object
  *             required:
- *               - email
+ *               - emailOrPhone
  *             properties:
- *               email:
+ *               emailOrPhone:
  *                 type: string
- *                 format: email
  *     responses:
  *       200:
  *         description: If this email exists, a reset link has been sent.
@@ -34,17 +37,33 @@ import { BASE_URL, createVerificationToken } from "@/lib/globals";
  *                   type: string
  */
 export async function POST(req: Request) {
-  let { email } = await req.json();
-  email = email.toLowerCase();
+  let { emailOrPhone:gottenData } = await req.json();
 
+      const isEmail = z.email().safeParse(gottenData).success
+      const email = isEmail ? gottenData.toLocaleLowerCase() : gottenData
+      const phone = !isEmail ? normalizePhone(gottenData) : null
+  
+  
+      if (!isEmail && !phone) {
+        return NextResponse.json(
+          { message: "Invalid phone number format" },
+          { status: 400 }
+        )
+      }
   //   await rateLimit(req);
 
-  if (!email) {
-    return NextResponse.json({ message: "Email is required" }, { status: 400 });
-  }
+  // if (!email) {
+  //   return NextResponse.json({ message: "Email is required" }, { status: 400 });
+  // }
 
-  const user = await prisma.user.findUnique({
-    where: { email, status: "ACTIVE" },
+  const user = await prisma.user.findFirst({
+    where: { 
+      OR: [
+          isEmail ? { email: email } : undefined,
+          phone ? { phone } : undefined,
+        ].filter(Boolean) as UserWhereInput[], 
+      status: "ACTIVE"
+     },
   });
 
   if (!user) {
@@ -54,28 +73,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const token = createVerificationToken(user.email as string);
-  const RESET_LINK = `${BASE_URL}/reset-password?token=${token}`;
+  const otp = await createOtp(user.id);
+  const current_year = new Date().getFullYear()
 
-  await prisma.user.update({
-    where: {
-      id: user?.id,
-    },
-    data: {
-      verificationLink: RESET_LINK,
-    },
-  });
-  await sendEmail({
-    to: user.email as string,
-    subject: "Reset Your Password!",
-    template: "forgot-password",
-    data: {
-      RESET_LINK,
-      name: `${user.firstName} ${user.lastName}`,
-      year: new Date().getFullYear(),
-      data: { RESET_LINK },
-    },
-  });
+  if(isEmail){
+    await sendEmail({
+      to: user.email as string,
+      subject: "Reset Your Password!",
+      template: "forgot-password",
+      data: {
+        otp,
+        current_year,
+      },
+    });
+  }else{
+    await sendSmsOtp(user.phone as string, otp)
+  }
+  
 
   return NextResponse.json({
     message: "If this email exists, a reset link has been sent",

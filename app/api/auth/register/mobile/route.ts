@@ -59,15 +59,6 @@ const CreateUserSchema = z
         .refine((value) => !value.match(emojiRegex), {
           message: "No emoji's alllowed.",
         }),
-      callbackUrl: z
-        .string()
-        .min(1, { message: "This field is mandatory" })
-        .refine((value) => !value || validateForEmptySpaces(value), {
-          message: "No empty spaces",
-        })
-        .refine((value) => !value.match(emojiRegex), {
-          message: "No emoji's alllowed.",
-        }),
       // role: z.enum(["STUDENT", "INSTRUCTOR", "ADMIN"]).optional(),
     })
     .refine((data) => data.confirmPassword === data.password, {
@@ -90,16 +81,22 @@ const CreateUserSchema = z
  *           schema:
  *             type: object
  *             required:
- *               - email
+ *               - emailOrPhone
  *               - password
- *               - username
  *             properties:
  *               emailOrPhone:
  *                 type: string
- *                 format: email
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *               password:
+ *                 type: string
  *     responses:
  *       201:
- *         description: User created successfully, Please verify your email.
+ *         description: User created successfully, Please verify your email or number.
  *         content:
  *           application/json:
  *             schema:
@@ -107,7 +104,11 @@ const CreateUserSchema = z
  *               properties:
  *                 id:
  *                   type: string
- *                 emailOrPhone:
+ *                 firstName:
+ *                   type: string
+ *                 lastName:
+ *                   type: string
+ *                 role:
  *                   type: string
  *       400:
  *         description: Invalid request
@@ -125,11 +126,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const { firstName, lastName, password, emailOrPhone } = parsed.data;
+    const { firstName, lastName, password, emailOrPhone:gottenData } = parsed.data;
 
 
-    const isEmail = z.email().safeParse(emailOrPhone).success
+    const isEmail = z.email().safeParse(gottenData).success
+    const emailOrPhone = isEmail ? gottenData.toLocaleLowerCase() : gottenData
     const phone = !isEmail ? normalizePhone(emailOrPhone) : null
+
 
     if (!isEmail && !phone) {
       return NextResponse.json(
@@ -158,7 +161,7 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-        const user = await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email: isEmail ? emailOrPhone : null,
         phone,
@@ -167,21 +170,25 @@ export async function POST(req: Request) {
         passwordHash: hashedPassword,
         role: "PASSENGER",
       },
-      select: { id: true, firstName: true },
+      select: { id: true, firstName: true, lastName: true, role: true },
     })
 
 
 
     const otp = await createOtp(user.id);
+    const current_year = new Date().getFullYear()
+    const name = `${firstName} ${lastName}`
+
 
     if (isEmail) {
       await sendEmail({
         to: emailOrPhone,
-        subject: "Verify your account",
-        template: "pin-otp",
+        subject: "You're In! Welcome to CBT 🎉",
+        template: "signup-verification",
         data: {
-          name: `${firstName} ${lastName}`,
-          otp_code: otp,
+          name: name,
+          otp: otp,
+          current_year
         },
       })
     } else if (phone) {

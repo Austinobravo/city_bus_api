@@ -23,11 +23,11 @@ export async function sendEmail({
   const html = await compileTemplate(template, data);
 
   const transporter = nodemailer.createTransport({
-  host: 'mail.smegear.agency',
+  host: 'mail.citybustransit.com',
   port: 587,
   secure: false, 
   auth: {
-    user: 'noreply@smegear.agency',
+    user: 'noreply@citybustransit.com',
     pass: process.env.EMAIL_PASSWORD,
   },
   tls: {
@@ -36,7 +36,7 @@ export async function sendEmail({
 });
 
   const mailOptions = {
-    from: '"SmeGear" <noreply@smegear.agency>',
+    from: '"CITYBUSTRANSIT" <noreply@citybustransit.com>',
     to,
     subject,
     html,

@@ -33,6 +33,8 @@ export function generateOtp() {
 }
 
 export function normalizePhone(phone: string) {
+  if(!phone) return null
+
   let cleaned = phone.replace(/[^\d+]/g, "")
 
   if (cleaned.startsWith("0")) {
