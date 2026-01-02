@@ -4,6 +4,7 @@ import prisma from "@/prisma/prisma";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import axios from "axios";
+import { signAccessToken, signRefreshToken } from "@/lib/tokens";
 
 const JWT_SECRET = process.env.NEXTAUTH_SECRET!;
 const JWT_EXPIRES_IN = "1h"; // access token
@@ -88,6 +89,8 @@ async function verifyFacebookToken(accessToken: string) {
  *                   type: string
  *                 accessToken:
  *                   type: string
+ *                 refreshToken:
+ *                   type: string
  */
 
 export async function POST(req: NextRequest) {
@@ -118,7 +121,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email not provided by social login" }, { status: 400 });
     }
 
-    const email = socialUser.email || optionalEmail!;
+    const email = (socialUser.email || optionalEmail!).toLocaleLowerCase();
     const name = socialUser.name || email.split("@")[0];
 
     // Check if user exists
@@ -148,33 +151,39 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate access + refresh tokens
-    const { accessToken, refreshToken } = generateTokens(user.id);
+    // const { accessToken, refreshToken } = generateTokens(user.id);
+    const accessToken = signAccessToken(user.id)
+    const refreshToken = signRefreshToken(user.id)
 
     // Save refresh token in DB
     // await prisma.refreshToken.create({
     //   data: { token: refreshToken, userId: user.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
     // });
+    
+    await prisma.refreshToken.create({
+        data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 864e5),
+        },
+    })
 
     // Audit log
-//     await prisma.auditLog.create({
-//       data: {
-//         userId: user.id,
-//         entity: provider,
-//         action: "LOGIN",
-//         method: "SOCIAL",
-//         ip: req.headers.get("x-forwarded-for") || "unknown",
-//         userAgent: req.headers.get("user-agent") || "unknown",
-//       },
-// //       userId    String?
-// //   action    AuditAction
-// //   entity    String
-// //   entityId  String?
-// //   metadata  Json?
-//     });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        entity: provider,
+        action: "LOGIN",
+        method: "SOCIAL",
+        ip: req.headers.get("x-forwarded-for") || "unknown",
+        userAgent: req.headers.get("user-agent") || "unknown",
+      },
+    });
 
     return NextResponse.json({
       message: "Login Successful",
       accessToken,
+      refreshToken
     });
   } catch (err: any) {
     console.error("Social login error:", err.response?.data || err.message);

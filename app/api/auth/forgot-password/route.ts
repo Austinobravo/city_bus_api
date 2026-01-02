@@ -39,32 +39,42 @@ import { sendSmsOtp } from "@/lib/twilio";
 export async function POST(req: Request) {
   let { emailOrPhone:gottenData } = await req.json();
 
-      const isEmail = z.email().safeParse(gottenData).success
-      const email = isEmail ? gottenData.toLocaleLowerCase() : gottenData
-      const phone = !isEmail ? normalizePhone(gottenData) : null
-  
-  
-      if (!isEmail && !phone) {
-        return NextResponse.json(
-          { message: "Invalid phone number format" },
-          { status: 400 }
-        )
-      }
+    const isEmail = z.email().safeParse(gottenData).success
+    const identifier = isEmail ? gottenData.toLocaleLowerCase() : gottenData
+    const phone = !isEmail ? normalizePhone(gottenData) : null
+
+
+    if (!isEmail && !phone) {
+    return NextResponse.json(
+        { message: "Invalid phone number format" },
+        { status: 400 }
+    )
+    }
   //   await rateLimit(req);
 
   // if (!email) {
   //   return NextResponse.json({ message: "Email is required" }, { status: 400 });
   // }
 
-  const user = await prisma.user.findFirst({
-    where: { 
-      OR: [
-          isEmail ? { email: email } : undefined,
-          phone ? { phone } : undefined,
-        ].filter(Boolean) as UserWhereInput[], 
-      status: "ACTIVE"
-     },
-  });
+    let user = null
+
+    if (isEmail) {
+      user = await prisma.user.findUnique({
+        where: { email: identifier },
+      })
+
+    } else {
+      const phone = normalizePhone(identifier)
+
+      if (!phone) {
+        return NextResponse.json({ error: "Invalid phone number" }, { status: 401 })
+      }
+
+      user = await prisma.user.findUnique({
+        where: { phone },
+      })
+
+    }
 
   if (!user) {
     return NextResponse.json(

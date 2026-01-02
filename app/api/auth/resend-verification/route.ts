@@ -37,17 +37,13 @@ export const POST = async (req: Request) => {
   try {
     let { emailOrPhone:gottenData } = await req.json();
    
-    // console.log("emailOrPhone", emailOrPhone)
-    console.log("gottenData", gottenData)
+
     const isEmail = z.email().safeParse(gottenData).success
-    const email = isEmail ? gottenData.toLocaleLowerCase() : gottenData
+    const identifier = isEmail ? gottenData.toLocaleLowerCase() : gottenData
     const phone = !isEmail ? normalizePhone(gottenData) : null
 
 
     if (!isEmail && !phone) {
-        console.log("isEmail", isEmail)
-        console.log("email", email)
-        console.log("phone", phone)
     return NextResponse.json(
         { message: "Invalid phone number format" },
         { status: 400 }
@@ -55,14 +51,20 @@ export const POST = async (req: Request) => {
     }
 
 
-      const user = await prisma.user.findFirst({
-        where: { 
-          OR: [
-              isEmail ? { email: email } : undefined,
-              phone ? { phone } : undefined,
-            ].filter(Boolean) as UserWhereInput[], 
-         },
-      });
+    let user = null
+
+    if (isEmail) {
+        user = await prisma.user.findUnique({
+        where: { email: identifier },
+        })
+
+    } else {
+
+        user = await prisma.user.findUnique({
+        where: { phone: phone as string },
+        })
+
+    }
 
     if (!user) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });

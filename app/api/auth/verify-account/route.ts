@@ -86,30 +86,44 @@ export const POST = async (req: Request) => {
  
 
     const isEmail = z.email().safeParse(emailOrPhone).success
+    const email = isEmail ? emailOrPhone.toLocaleLowerCase() : emailOrPhone
     const phone = !isEmail ? normalizePhone(emailOrPhone) : null
+    
+    
+        if (!isEmail && !phone) {
+        return NextResponse.json(
+            { message: "Invalid phone number format" },
+            { status: 400 }
+        )
+        }
+      
+      let existingUser = null
+      
+      // Check if user already exists
+        if (isEmail) {
+          existingUser = await prisma.user.findUnique({
+            where: { email: email },
+          })
+    
+        } else {
+          const phone = normalizePhone(email)
+    
+          if (!phone) {
+            return NextResponse.json({ error: "Invalid phone number" }, { status: 401 })
+          }
+    
+          existingUser = await prisma.user.findUnique({
+            where: { phone },
+          })
+    
+        }
 
-    if (!isEmail && !phone) {
-      return NextResponse.json(
-        { message: "Invalid phone number format" },
-        { status: 400 }
-      )
-    }
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          isEmail ? { email: emailOrPhone } : undefined,
-          phone ? { phone } : undefined,
-        ].filter(Boolean) as UserWhereInput[],
-      },
-    })
-
-    if (!existingUser) {
-      return NextResponse.json(
-        { message: "User does not exist." },
-        { status: 400 }
-      )
-    }
+        if (!existingUser) {
+          return NextResponse.json(
+            { message: "User does not exists." },
+            { status: 400 }
+          );
+        }
   try {
 
     if(existingUser.status === "ACTIVE"){

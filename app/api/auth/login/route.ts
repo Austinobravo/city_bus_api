@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
 
-function mergeCookies(existing: string[] = [], incoming: string[] = []) {
-  return [...existing, ...incoming].join("; ");
-}
+import { BASE_URL, emojiRegex, normalizePhone } from "@/lib/globals";
+import prisma from "@/prisma/prisma";
+
+import { signAccessToken, signRefreshToken } from "@/lib/tokens";
+import z from "zod";
+import { comparePassword } from "@/lib/utils";
+import { UserWhereUniqueInput } from "@/lib/generated/prisma/models";
+
 
 /**
  * @swagger
@@ -24,7 +28,6 @@ function mergeCookies(existing: string[] = [], incoming: string[] = []) {
  *             properties:
  *               emailOrPhone:
  *                 type: string
- *                 format: email
  *               password:
  *                 type: string
  *     responses:
@@ -41,71 +44,95 @@ function mergeCookies(existing: string[] = [], incoming: string[] = []) {
  *                   type: string
  *                 accessToken:
  *                   type: string
+ *                 refreshToken:
+ *                   type: string
  */
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { emailOrPhone, password } = body;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const { emailOrPhone, password } = await req.json()
 
-    // Step 1: CSRF
-    const csrfRes = await axios.get(`${baseUrl}/api/auth/csrf`, {
-      withCredentials: true,
-    });
-    const csrfToken = csrfRes.data?.csrfToken;
-    const csrfCookies = csrfRes.headers["set-cookie"] ?? [];
 
-    if (!csrfToken) {
-      return NextResponse.json({ error: "Unable to get CSRF token" }, { status: 400 });
+  const identifier = emailOrPhone.trim().toLowerCase()
+
+  if (identifier.trim().length <= 1 || password.trim().length <= 1)  return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+  if (identifier.match(emojiRegex) || password.match(emojiRegex))  return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+      
+  const isEmail = z.email().safeParse(identifier).success
+
+  let user = null
+
+  if (isEmail) {
+    user = await prisma.user.findUnique({
+      where: { email: identifier },
+    })
+
+  } else {
+    const phone = normalizePhone(identifier)
+
+    if (!phone) {
+      return NextResponse.json({ error: "Invalid phone number" }, { status: 401 })
     }
 
-    // Step 2: Login
-    const loginRes = await axios.post(
-      `${baseUrl}/api/auth/callback/credentials`,
-      new URLSearchParams({
-        csrfToken,
-        email: emailOrPhone.trim(),
-        password: password.trim(),
-        callbackUrl: "/",
-        json: "true",
-      }),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Cookie: csrfCookies.join(";"),
-        },
-        maxRedirects: 0,
-        validateStatus: (status) => status < 500,
-      }
-    );
+    user = await prisma.user.findUnique({
+      where: { phone },
+    })
 
-    const loginCookies = loginRes.headers["set-cookie"] ?? [];
-    const combinedCookies = mergeCookies(csrfCookies, loginCookies);
-
-    // Step 3: Fetch session
-    const sessionRes = await axios.get(`${baseUrl}/api/auth/session`, {
-      headers: { Cookie: combinedCookies },
-    });
-
-    const session = sessionRes.data;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Session not found" }, { status: 401 });
-    }
-
-    // Step 4: Return session and set cookies locally
-    const res = NextResponse.json({ success: true, session });
-
-    [...csrfCookies, ...loginCookies].forEach((cookie) => {
-      res.headers.append("Set-Cookie", cookie);
-    });
-
-    return res;
-  } catch (err: any) {
-    console.error(" login error:", err.response?.data || err.message);
-    return NextResponse.json(
-      { error: err.response?.data || err.message },
-      { status: 500 }
-    );
   }
+
+  // const user = await prisma.user.findUnique({ where: { email } })
+  if (!user || !user.passwordHash) {
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+  }
+
+   if (user?.status !== "ACTIVE")  return NextResponse.json({ error: "Unverified account. Please contact support." }, { status: 401 })
+
+  
+  const isCorrectPassword = await comparePassword(password, user.passwordHash.trim());
+  if (!isCorrectPassword) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+  
+
+  // const valid = await bcrypt.compare(password, user.passwordHash)
+  if (!isCorrectPassword) {
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+  }
+
+  try{
+
+    const accessToken = signAccessToken(user.id)
+    const refreshToken = signRefreshToken(user.id)
+  
+    await prisma.refreshToken.deleteMany({
+      where: {
+        userId: user.id,
+      },
+    })
+  
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 864e5),
+      },
+    })
+  
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "LOGIN",
+        method: "CREDENTIALS",
+        ip: req.headers.get("x-forwarded-for") ?? "unknown",
+        userAgent: req.headers.get("user-agent") ?? "unknown",
+      },
+    })
+  
+     return NextResponse.json({
+        message: "Login Successful",
+        accessToken,
+        refreshToken
+      });
+  }catch(error:any){
+    console.error("Error Login:", error)
+    return NextResponse.json({ message: "Something went wrong" , error: error}, { status: 500 });
+  }
+
 }
+
