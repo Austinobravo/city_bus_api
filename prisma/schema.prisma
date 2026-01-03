@@ -194,6 +194,8 @@ model Route {
   stops         RouteStop[]
   trips         Trip[]
   promos        PromoCode[]
+
+  
 }
 
 model RouteStop {
@@ -209,6 +211,7 @@ model RouteStop {
   updatedAt    DateTime      @updatedAt
 
   route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  @@index([routeId, order])
 }
 
 //////////////////////////
@@ -248,10 +251,15 @@ model BusLocation {
   etaMin    Int?     // ETA to next stop
   recordedAt DateTime @default(now())
 
+  speedKmh    Float?   // optional
+  heading     Float?   // optional (for map arrow)
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   trip      Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, recordedAt])
 }
 
 //////////////////////////
