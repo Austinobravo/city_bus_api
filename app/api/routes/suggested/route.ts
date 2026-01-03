@@ -10,6 +10,19 @@ import { verifyToken } from "@/lib/tokens";
  *     summary: Get suggested routes based on user address or location
  *     tags:
  *       - Routes
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: pageSize
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: search
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: List of suggested routes

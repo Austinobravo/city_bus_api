@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
 import { UserRole } from "@/lib/generated/prisma/enums";
 import { checkRole } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/getCurrentUser";
 
 /**
  * @swagger
@@ -11,6 +12,19 @@ import { checkRole } from "@/lib/auth";
  *     summary: Get all promo codes
  *     tags:
  *       - Promos
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: pageSize
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: search
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: List of promo codes
@@ -33,6 +47,9 @@ import { checkRole } from "@/lib/auth";
  *         description: Promo created
  */
 export async function GET(req: NextRequest) {
+    const user = await getCurrentUser(req);
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     try {
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get("page") || "1");

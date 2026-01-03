@@ -11,6 +11,19 @@ import { UserRole } from "@/lib/generated/prisma/enums";
  *     summary: List payments
  *     tags:
  *       - Payments
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: pageSize
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: search
+ *         schema:
+ *           type: string
  */
 export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req);

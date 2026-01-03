@@ -9,6 +9,19 @@ import prisma from "@/prisma/prisma";
  *     summary: Get all routes
  *     tags:
  *       - Routes
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: pageSize
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: search
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: List of all routes

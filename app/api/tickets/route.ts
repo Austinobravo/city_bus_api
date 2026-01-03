@@ -11,6 +11,19 @@ import { TicketStatus, UserRole } from "@/lib/generated/prisma/enums";
  *     summary: Get tickets (User sees own, Admin sees all)
  *     tags:
  *       - Tickets
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: pageSize
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: search
+ *         schema:
+ *           type: string
  *   post:
  *     summary: Book a ticket
  *     tags:

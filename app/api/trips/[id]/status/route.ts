@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
-import { TripStatus, StopType } from "@prisma/client";
+import { TripStatus, StopType } from "@/lib/generated/prisma/enums";
 
 /**
  * @swagger
