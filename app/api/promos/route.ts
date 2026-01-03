@@ -42,6 +42,15 @@ import { getCurrentUser } from "@/lib/getCurrentUser";
  *               - code
  *               - discountPct
  *               - expiresAt
+ *             properties:
+ *               routeId:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               discountPct:
+ *                 type: string
+ *               expiresAt:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Promo created

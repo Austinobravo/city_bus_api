@@ -48,7 +48,39 @@ import prisma from "@/prisma/prisma";
  *     responses:
  *       200:
  *         description: Stop deleted
+*   get:
+ *     summary: Get a route by ID
+ *     tags:
+ *       - Route Stops
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Route details
+ *       404:
+ *         description: Route not found
  */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const route = await prisma.routeStop.findUnique({
+            where: { id },
+        });
+
+        if (!route) {
+            return NextResponse.json({ error: "Route Stop not found" }, { status: 404 });
+        }
+
+        return NextResponse.json(route);
+    } catch (error) {
+        console.error("Error fetching route:", error);
+        return NextResponse.json({ error: "Failed to fetch route" }, { status: 500 });
+    }
+}
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;

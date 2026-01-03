@@ -7,6 +7,7 @@ import { signAccessToken, signRefreshToken } from "@/lib/tokens";
 import z from "zod";
 import { comparePassword } from "@/lib/utils";
 import { UserWhereUniqueInput } from "@/lib/generated/prisma/models";
+import { sendEmail } from "@/emails/mailer";
 
 
 /**
@@ -123,6 +124,24 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") ?? "unknown",
       },
     })
+
+    try{
+      if(user.email){
+        await sendEmail({
+          to: user.email,
+          subject: "Login Notification",
+          template: "signin",
+          data: { 
+            name: `${user.firstName} ${user.lastName}`,
+            contact_url: `https://citybustransit.com/contact`, 
+            year: new Date().getFullYear()
+          },
+        });
+      }
+
+    }catch(error){
+      console.log("error in sending email", error)
+    }
   
      return NextResponse.json({
         message: "Login Successful",

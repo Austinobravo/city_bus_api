@@ -11,14 +11,42 @@ import { checkRole } from "@/lib/auth";
  *     summary: Get promo by ID
  *     tags:
  *       - Promos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  *   patch:
  *     summary: Update promo
  *     tags:
  *       - Promos
+ *    parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+  *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *               discountPct:
+ *                 type: string
  *   delete:
  *     summary: Delete promo
  *     tags:
  *       - Promos
+ *    parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const auth = await checkRole(req, [UserRole.ADMIN, UserRole.OPERATIONS]);

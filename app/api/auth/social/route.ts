@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import axios from "axios";
 import { signAccessToken, signRefreshToken } from "@/lib/tokens";
+import { sendEmail } from "@/emails/mailer";
 
 const JWT_SECRET = process.env.NEXTAUTH_SECRET!;
 const JWT_EXPIRES_IN = "1h"; // access token
@@ -179,6 +180,24 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
+
+        try{
+          if(user.email){
+            await sendEmail({
+              to: user.email,
+              subject: "Login Notification",
+              template: "signin",
+              data: { 
+                name: `${user.firstName} ${user.lastName}`,
+                contact_url: `https://citybustransit.com/contact`, 
+                year: new Date().getFullYear()
+              },
+            });
+          }
+    
+        }catch(error){
+          console.log("error in sending email", error)
+        }
 
     return NextResponse.json({
       message: "Login Successful",
