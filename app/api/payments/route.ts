@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         const [payments, total] = await Promise.all([
             prisma.payment.findMany({
                 where,
-                include: { ticket: { include: { trip: { include: { route: true } } } } },
+                include: { ticket: true },
                 skip,
                 take: pageSize,
                 orderBy: { createdAt: "desc" }

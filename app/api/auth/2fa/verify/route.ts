@@ -50,23 +50,23 @@ export async function POST(req: NextRequest) {
         // Verify OTP using helper
         await verifyOtp(user.id, otp);
 
-        // Toggle otpEnabled status
+        // Toggle is2faVerified status
         // We fetching fresh status just in case, though user object has it.
         // Actually user object from getCurrentUser might be stale? getCurrentUser hits DB usually.
         // Let's toggle.
-        const currentUserState = await prisma.user.findUnique({ where: { id: user.id }, select: { otpEnabled: true } });
+        const currentUserState = await prisma.user.findUnique({ where: { id: user.id }, select: { is2faVerified: true } });
 
-        const newState = !currentUserState?.otpEnabled;
+        const newState = !currentUserState?.is2faVerified;
 
         const updatedUser = await prisma.user.update({
             where: { id: user.id },
-            data: { otpEnabled: newState },
-            select: { id: true, otpEnabled: true }
+            data: { is2faVerified: newState },
+            select: { id: true, is2faVerified: true }
         });
 
         return NextResponse.json({
-            message: `2FA is now ${updatedUser.otpEnabled ? 'enabled' : 'disabled'}`,
-            otpEnabled: updatedUser.otpEnabled
+            message: `2FA is now ${updatedUser.is2faVerified ? 'enabled' : 'disabled'}`,
+            is2faVerified: updatedUser.is2faVerified
         });
 
     } catch (error: any) {
