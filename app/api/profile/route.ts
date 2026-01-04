@@ -8,10 +8,12 @@ import { z } from "zod";
 
 // User update schema
 const UpdateUserSchema = z.object({
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  password: z.string().min(6).optional(),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1, "First name cannot be empty").optional(),
+  lastName: z.string().trim().min(1, "Last name cannot be empty").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  phone: z.string().trim().optional(),
+  houseAddress: z.string().trim().optional(),
+  workAddress: z.string().trim().optional(),
   // role: z.enum(["STUDENT", "INSTRUCTOR", "ADMIN"]).optional(),
 });
 
@@ -32,24 +34,25 @@ const UpdateUserSchema = z.object({
  *               items:
  *                 type: object
  */
-export async function GET(req:NextRequest) {
-  const  user = await getCurrentUser(req)
-  
-  if(!user){
-    return NextResponse.json({message: "Unauthorized"}, {status: 401})
+export async function GET(req: NextRequest) {
+  const user = await getCurrentUser(req)
+
+  if (!user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
   }
-  const foundUser = await prisma.user.findUnique({where:{id:user?.id}, 
-    omit:{
-    passwordHash:true,
-    verificationLink:true,
-    isDeleted:true,
-    deletedAt:true,
-    otpEnabled:true,
-    socialAuth:true,
-    createdAt:true,
-    updatedAt:true,
-}
-});
+  const foundUser = await prisma.user.findUnique({
+    where: { id: user?.id },
+    omit: {
+      passwordHash: true,
+      verificationLink: true,
+      isDeleted: true,
+      deletedAt: true,
+      otpEnabled: true,
+      socialAuth: true,
+      createdAt: true,
+      updatedAt: true,
+    }
+  });
   return NextResponse.json(foundUser);
 }
 
@@ -79,16 +82,20 @@ export async function GET(req:NextRequest) {
  *                 type: string
  *               password:
  *                 type: string
+ *               houseAddress:
+ *                 type: string
+ *               workAddress:
+ *                 type: string
  *     responses:
  *       200:
  *         description: User updated successfully
  */
 export async function PATCH(req: NextRequest) {
-    const user = await getCurrentUser(req)
-    if(!user){
-        return NextResponse.json({ message: "Unauthorized"}, { status: 401 });
-    }
-    
+  const user = await getCurrentUser(req)
+  if (!user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const parsed = UpdateUserSchema.safeParse(body);
@@ -97,7 +104,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ message: "Invalid data", errors: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { firstName, lastName, phone, password } = parsed.data;
+    const { firstName, lastName, phone, password, houseAddress, workAddress } = parsed.data;
 
     let updateData: any = {};
     if (firstName) updateData.firstName = firstName;
@@ -107,6 +114,8 @@ export async function PATCH(req: NextRequest) {
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
+    if (houseAddress) updateData.houseAddress = houseAddress;
+    if (workAddress) updateData.workAddress = workAddress;
 
     const updatedUser = await prisma.user.update({
       where: { email: user.email as string },
@@ -117,7 +126,10 @@ export async function PATCH(req: NextRequest) {
         firstName: true,
         lastName: true,
         role: true,
+        houseAddress: true,
+        workAddress: true,
       },
+
     });
 
     return NextResponse.json(updatedUser);
@@ -140,17 +152,17 @@ export async function PATCH(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   const user = await getCurrentUser(req)
-    if(!user){
-        return NextResponse.json({ message: "Unauthorized"}, { status: 401 });
-    }
+  if (!user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
   try {
     await prisma.user.delete({
-      where: { email:user.email as string},
+      where: { email: user.email as string },
     });
 
     return NextResponse.json({ message: "User deleted successfully." });
   } catch (error) {
     console.error("Error deleting user:", error);
-    return NextResponse.json({data: error, message: "Something went wrong." }, { status: 500 });
+    return NextResponse.json({ data: error, message: "Something went wrong." }, { status: 500 });
   }
 }

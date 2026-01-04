@@ -21,13 +21,13 @@ import { checkRole } from "@/lib/auth";
  *     summary: Update promo
  *     tags:
  *       - Promos
- *    parameters:
+ *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
-  *     requestBody:
+ *     requestBody:
  *       content:
  *         application/json:
  *           schema:
@@ -41,14 +41,14 @@ import { checkRole } from "@/lib/auth";
  *     summary: Delete promo
  *     tags:
  *       - Promos
- *    parameters:
+ *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
  */
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse<{ error: string; }> | NextResponse<{ id: string; routeId: string | null; createdAt: Date; updatedAt: Date; expiresAt: Date; code: string; discountPct: number; isActive: boolean; }> | undefined> {
     const auth = await checkRole(req, [UserRole.ADMIN, UserRole.OPERATIONS]);
     if (!auth.authorized) return auth.response;
 

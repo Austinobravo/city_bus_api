@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         let suggestedRoutes: any[] = [];
         let userId: string | null = null;
         let houseAddress: string | null = null;
+        let workAddress: string | null = null;
 
         // 1. Try to get User ID from Token
         const authHeader = req.headers.get("authorization");
@@ -60,38 +61,39 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // 2. If User, get House Address
+        // 2. If User, get House/Work Address
         if (userId) {
             const user = await prisma.user.findUnique({
                 where: { id: userId },
-                select: { houseAddress: true }
+                select: { houseAddress: true, workAddress: true }
             });
-            if (user?.houseAddress) {
-                houseAddress = user.houseAddress;
-            }
+            if (user?.houseAddress) houseAddress = user.houseAddress;
+            if (user?.workAddress) workAddress = user.workAddress;
         }
 
-        // 3. Logic: Address Match or Location Match
-        if (houseAddress) {
-            // Search for routes or stops matching the address string (case-insensitive)
-            // This assumes address contains keywords like "Orji", "Wetheral", etc.
-            const searchKeyword = houseAddress.split(',')[0].trim(); // Simple heuristic to take first part
+        // 3. Logic: Address Match
+        const addresses = [houseAddress, workAddress].filter(Boolean) as string[];
+
+        if (addresses.length > 0) {
+            // Extract first part of addresses as keywords
+            const keywords = addresses.map(addr => addr.split(',')[0].trim());
+
+            // Build OR conditions for each keyword
+            const conditions = keywords.flatMap(keyword => [
+                { name: { contains: keyword, mode: 'insensitive' } },
+                { origin: { contains: keyword, mode: 'insensitive' } },
+                { destination: { contains: keyword, mode: 'insensitive' } },
+                {
+                    stops: {
+                        some: {
+                            name: { contains: keyword, mode: 'insensitive' }
+                        }
+                    }
+                }
+            ]);
 
             suggestedRoutes = await prisma.route.findMany({
-                where: {
-                    OR: [
-                        { name: { contains: searchKeyword, mode: 'insensitive' } },
-                        { origin: { contains: searchKeyword, mode: 'insensitive' } },
-                        { destination: { contains: searchKeyword, mode: 'insensitive' } },
-                        {
-                            stops: {
-                                some: {
-                                    name: { contains: searchKeyword, mode: 'insensitive' }
-                                }
-                            }
-                        }
-                    ]
-                },
+                where: { OR: conditions as any }, // Type assertion might be needed if complex OR
                 include: { stops: true }
             });
         }

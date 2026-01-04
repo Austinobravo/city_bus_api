@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
             }
 
             return NextResponse.json({
-                authorization_url: paystackRes.da.authorization_url,
+                authorization_url: paystackRes.data.authorization_url,
                 reference,
-                access_code: paystackRes.da.access_code
+                access_code: paystackRes.data.access_code
             });
         }
 

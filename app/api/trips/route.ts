@@ -10,15 +10,15 @@ import prisma from "@/prisma/prisma";
  *     tags:
  *       - Trips
  *     parameters:
- *       - in: path
+ *       - in: query
  *         name: page
  *         schema:
  *           type: string
- *       - in: path
+ *       - in: query
  *         name: pageSize
  *         schema:
  *           type: string
- *       - in: path
+ *       - in: query
  *         name: search
  *         schema:
  *           type: string

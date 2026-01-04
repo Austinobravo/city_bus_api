@@ -44,6 +44,12 @@ enum TicketStatus {
   USED
   CANCELLED
   REFUNDED
+  ACTIVE
+}
+
+enum TicketType {
+  SINGLE
+  ROUND
 }
 
 enum PaymentMethod {
@@ -79,35 +85,41 @@ enum AuditAction {
 //////////////////////////
 
 model User {
-  id           String        @id @default(uuid())
-  email        String?       @unique
-  phone        String?       @unique
-  firstName    String
-  lastName     String
-  passwordHash String
-  role         UserRole
-  status       AccountStatus @default(PENDING)
+  id               String        @id @default(uuid())
+  email            String?       @unique
+  phone            String?       @unique
+  firstName        String
+  lastName         String
+  passwordHash     String
+  role             UserRole
+  status           AccountStatus @default(PENDING)
   verificationLink String?
-  houseAddress String?
+  houseAddress     String?
+  workAddress      String?
+  is2faVerified    Boolean       @default(false)
 
-  isDeleted    Boolean?       @default(false)
-  deletedAt    DateTime?
+  isDeleted Boolean?  @default(false)
+  deletedAt DateTime?
 
-  otpEnabled   Boolean       @default(true)
-  socialAuth   Boolean       @default(false)
+  otpEnabled Boolean @default(true)
+  socialAuth Boolean @default(false)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  driver       Driver?
-  wallet       Wallet?
-  tickets      Ticket[]
-  payments     Payment[]
-  auditLogs    AuditLog[]
+  driver    Driver?
+  wallet    Wallet?
+  tickets   Ticket[]
+  payments  Payment[]
+  auditLogs AuditLog[]
 
   otps Otp[]
 
   refreshTokens RefreshToken[]
+
+  ticketCoverages TicketCoverage[]
+
+  notifications Notification[]
 }
 
 //////////////////////////
@@ -115,18 +127,18 @@ model User {
 //////////////////////////
 
 model Driver {
-  id              String   @id @default(uuid())
-  userId          String   @unique
+  id     String @id @default(uuid())
+  userId String @unique
 
-  licenseNumber   String
-  licenseExpiry   DateTime
-  kycVerified     Boolean  @default(false)
+  licenseNumber String
+  licenseExpiry DateTime
+  kycVerified   Boolean  @default(false)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trips           Trip[]
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trips Trip[]
 }
 
 //////////////////////////
@@ -134,14 +146,14 @@ model Driver {
 //////////////////////////
 
 model Wallet {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  balance   Decimal  @default(0)
+  id      String  @id @default(uuid())
+  userId  String  @unique
+  balance Decimal @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 //////////////////////////
@@ -149,31 +161,32 @@ model Wallet {
 //////////////////////////
 
 model Bus {
-  id          String     @id @default(uuid())
-  plateNumber String     @unique
+  id          String    @id @default(uuid())
+  plateNumber String    @unique
   capacity    Int
   status      BusStatus
   model       String?
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  seats       Seat[]
-  trips       Trip[]
+  seats Seat[]
+  trips Trip[]
 }
 
 model Seat {
-  id        String   @id @default(uuid())
-  busId     String
-  seatNo    Int
+  id     String @id @default(uuid())
+  busId  String
+  seatNo Int
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  bus       Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
+  bus Bus @relation(fields: [busId], references: [id], onDelete: Cascade)
+
+  ticketCoverages TicketCoverage[]
 
   @@unique([busId, seatNo])
-  tickets Ticket[]
 }
 
 //////////////////////////
@@ -181,36 +194,35 @@ model Seat {
 //////////////////////////
 
 model Route {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   name          String
   origin        String
   destination   String
   price         Decimal
-  estimatedTime Int      // minutes
+  estimatedTime Int // minutes
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  stops         RouteStop[]
-  trips         Trip[]
-  promos        PromoCode[]
-
-  
+  stops  RouteStop[]
+  trips  Trip[]
+  promos PromoCode[]
 }
 
 model RouteStop {
-  id          String   @id @default(uuid())
-  routeId     String
-  name        String
-  latitude    Float
-  longitude   Float
-  order       Int
-  stopType    StopType
+  id        String   @id @default(uuid())
+  routeId   String
+  name      String
+  latitude  Float
+  longitude Float
+  order     Int
+  stopType  StopType
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
   @@index([routeId, order])
 }
 
@@ -219,24 +231,25 @@ model RouteStop {
 //////////////////////////
 
 model Trip {
-  id            String     @id @default(uuid())
-  routeId       String
-  busId         String
-  driverId      String
+  id       String @id @default(uuid())
+  routeId  String
+  busId    String
+  driverId String
 
   departureTime DateTime
   arrivalTime   DateTime?
   status        TripStatus @default(SCHEDULED)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  route         Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  bus           Bus        @relation(fields: [busId], references: [id], onDelete: Cascade)
-  driver        Driver     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  route  Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  bus    Bus    @relation(fields: [busId], references: [id], onDelete: Cascade)
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
-  tickets       Ticket[]
-  locations     BusLocation[]
+  locations BusLocation[]
+
+  ticketCoverages TicketCoverage[]
 }
 
 //////////////////////////
@@ -244,20 +257,20 @@ model Trip {
 //////////////////////////
 
 model BusLocation {
-  id        String   @id @default(uuid())
-  tripId    String
-  latitude  Float
-  longitude Float
-  etaMin    Int?     // ETA to next stop
+  id         String   @id @default(uuid())
+  tripId     String
+  latitude   Float
+  longitude  Float
+  etaMin     Int? // ETA to next stop
   recordedAt DateTime @default(now())
 
-  speedKmh    Float?   // optional
-  heading     Float?   // optional (for map arrow)
+  speedKmh Float? // optional
+  heading  Float? // optional (for map arrow)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  trip      Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId, recordedAt])
 }
@@ -267,21 +280,39 @@ model BusLocation {
 //////////////////////////
 
 model Ticket {
-  id         String       @id @default(uuid())
-  userId     String
-  tripId     String
-  seatId     String
+  id     String @id @default(uuid())
+  userId String
+  name   String
+  beneficiaryId String?
 
-  price      Decimal
-  status     TicketStatus
+  price  Decimal
+  status TicketStatus
+  type   TicketType   @default(SINGLE)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  dueDate        DateTime?
+  estimatedUsage Int @default(1)
 
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip       Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  seat       Seat         @relation(fields: [seatId], references: [id], onDelete: Cascade)
-  payment    Payment?
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  ticketCoverages TicketCoverage[]
+}
+
+model TicketCoverage {
+  id        String   @id @default(uuid())
+  userId    String
+  ticketId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tripId    String
+  seatId    String
+
+  seat   Seat   @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 }
 
 //////////////////////////
@@ -289,20 +320,20 @@ model Ticket {
 //////////////////////////
 
 model Payment {
-  id          String        @id @default(uuid())
-  userId      String
-  ticketId    String        @unique
+  id       String @id @default(uuid())
+  userId   String
+  ticketId String @unique
 
-  amount      Decimal
-  method      PaymentMethod
-  status      PaymentStatus
-  reference   String?       @unique
+  amount    Decimal
+  method    PaymentMethod
+  status    PaymentStatus
+  reference String?       @unique
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 }
 
 //////////////////////////
@@ -317,10 +348,28 @@ model PromoCode {
   expiresAt   DateTime
   isActive    Boolean  @default(true)
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  route       Route?  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  route Route? @relation(fields: [routeId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////
+// Notification
+//////////////////////////
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  body      String           @db.Text
+  read      Boolean          @default(false)
+  type      NotificationType @default(SYSTEM)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  isDeleted Boolean?         @default(false)
+  deletedAt DateTime?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 //////////////////////////
@@ -339,17 +388,15 @@ model AuditLog {
   ip        String?
   userAgent String?
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
 
 //////////////////////////
 // AUTH
 //////////////////////////
-
 
 model RefreshToken {
   id        String   @id @default(uuid())
@@ -359,21 +406,40 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
-  updatedAt    DateTime      @updatedAt
-
+  updatedAt DateTime @updatedAt
 }
 
 model Otp {
-  id           String   @id @default(uuid())
-  userId       String
-  codeHash     String
-  attempts     Int      @default(0)
-  expiresAt    DateTime
-  lastSentAt   DateTime
-  createdAt    DateTime @default(now())
-  
+  id         String   @id @default(uuid())
+  userId     String
+  codeHash   String
+  attempts   Int      @default(0)
+  expiresAt  DateTime
+  lastSentAt DateTime
+  createdAt  DateTime @default(now())
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+//////////////////////////
+// CONTACT US
+//////////////////////////
+
+model ContactUs {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+enum NotificationType {
+  SYSTEM
+  TRIP_UPDATE
+  PROMOTION
+  REMINDER
+  PAYMENT
 }

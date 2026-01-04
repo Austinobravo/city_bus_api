@@ -1,8 +1,7 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
 import bcrypt from "bcryptjs";
-import { UserRole, BusStatus, StopType, TripStatus, TicketStatus, PaymentStatus, PaymentMethod } from "@/lib/generated/prisma/enums";
+import { UserRole, BusStatus, StopType, TripStatus, TicketStatus, PaymentStatus, PaymentMethod, TicketType } from "@/lib/generated/prisma/enums";
 
 export async function POST(req: NextRequest) {
     try {
@@ -10,13 +9,13 @@ export async function POST(req: NextRequest) {
         const passwordHash = await bcrypt.hash("password123", 10);
 
         const usersData = [
-            { email: "admin1@cbt.com", firstName: "Chinedu", lastName: "Admin", role: UserRole.ADMIN },
-            { email: "admin2@cbt.com", firstName: "Ngozi", lastName: "Manager", role: UserRole.ADMIN },
+            { email: "admin1@cbt.com", firstName: "Chinedu", lastName: "Admin", role: UserRole.ADMIN, houseAddress: "123 Wetheral Rd, Owerri" },
+            { email: "admin2@cbt.com", firstName: "Ngozi", lastName: "Manager", role: UserRole.ADMIN, workAddress: "Govt House" },
             { email: "ops1@cbt.com", firstName: "Emeka", lastName: "Ops", role: UserRole.OPERATIONS },
             { email: "ops2@cbt.com", firstName: "Ada", lastName: "Coordinator", role: UserRole.OPERATIONS },
             { email: "driver1@cbt.com", firstName: "Kelechi", lastName: "Driver", role: UserRole.DRIVER },
             { email: "driver2@cbt.com", firstName: "Okechukwu", lastName: "Pilot", role: UserRole.DRIVER },
-            { email: "pass1@cbt.com", firstName: "Chioma", lastName: "User", role: UserRole.PASSENGER },
+            { email: "pass1@cbt.com", firstName: "Chioma", lastName: "User", role: UserRole.PASSENGER, houseAddress: "Orji Flyover" },
             { email: "pass2@cbt.com", firstName: "Uche", lastName: "Traveler", role: UserRole.PASSENGER },
             { email: "pass3@cbt.com", firstName: "Ifeanyi", lastName: "Rider", role: UserRole.PASSENGER },
             { email: "pass4@cbt.com", firstName: "Nneka", lastName: "Commuter", role: UserRole.PASSENGER },
@@ -34,23 +33,29 @@ export async function POST(req: NextRequest) {
                     lastName: u.lastName,
                     passwordHash,
                     role: u.role,
-                    status: "ACTIVE", // String literal as per schema or Enum? Schema has AccountStatus Enum
-                    // Wait, status is AccountStatus. I need to check schema if I should import AccountStatus
-                    // Schema: enum AccountStatus { PENDING, ACTIVE, ... }
-                    // Let's import AccountStatus too, or just use string "ACTIVE" if prisma accepts it (usually does).
-                    // Better be safe:
-                    // driver: ...
-                    // wallet: ...
+                    status: "ACTIVE",
+                    houseAddress: u.houseAddress,
+                    workAddress: u.workAddress
                 }
             });
-            // Updating status separately if using Enum to avoid import noise
-            // Actually, passing string "ACTIVE" usually works if the type matches.
-            // But to be precise let's update with raw query or just trust "ACTIVE" works.
         }
 
-        // ... (Rest of the file is largely same logic, just fixed imports)
+        // 1b. Create Driver Records
+        const driverUsers = await prisma.user.findMany({ where: { role: UserRole.DRIVER } });
+        for (const d of driverUsers) {
+            const existingDriver = await prisma.driver.findUnique({ where: { userId: d.id } });
+            if (!existingDriver) {
+                await prisma.driver.create({
+                    data: {
+                        userId: d.id,
+                        licenseNumber: `LIC-${Math.random().toString(36).substring(7).toUpperCase()}`,
+                        licenseExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 2)),
+                        kycVerified: true
+                    }
+                });
+            }
+        }
 
-        // Refresh Driver IDs map for linking
         const drivers = await prisma.driver.findMany();
         const passengers = await prisma.user.findMany({ where: { role: UserRole.PASSENGER } });
 
@@ -101,33 +106,6 @@ export async function POST(req: NextRequest) {
                     { name: "Worldbank Estate", lat: 5.470, lon: 7.010, order: 1, type: "PICKUP" },
                     { name: "Control Post", lat: 5.475, lon: 7.015, order: 2, type: "BOTH" },
                     { name: "Wetheral Junction", lat: 5.480, lon: 7.025, order: 3, type: "DROPOFF" }
-                ]
-            },
-            {
-                name: "Worldbank to Douglas",
-                origin: "Worldbank", destination: "Douglas", price: 200, time: 30,
-                stops: [
-                    { name: "Worldbank Last Bus Stop", lat: 5.470, lon: 7.010, order: 1, type: "PICKUP" },
-                    { name: "Assumpta Cathedral", lat: 5.478, lon: 7.018, order: 2, type: "BOTH" },
-                    { name: "Douglas Road", lat: 5.483, lon: 7.035, order: 3, type: "DROPOFF" }
-                ]
-            },
-            {
-                name: "Akwakuma to Douglas",
-                origin: "Akwakuma", destination: "Douglas", price: 300, time: 40,
-                stops: [
-                    { name: "Akwakuma Junction", lat: 5.510, lon: 7.020, order: 1, type: "PICKUP" },
-                    { name: "Amakohia", lat: 5.500, lon: 7.025, order: 2, type: "BOTH" },
-                    { name: "Douglas", lat: 5.483, lon: 7.035, order: 3, type: "DROPOFF" }
-                ]
-            },
-            {
-                name: "Akwakuma to Wetheral",
-                origin: "Akwakuma", destination: "Wetheral", price: 250, time: 30,
-                stops: [
-                    { name: "Akwakuma Roundabout", lat: 5.510, lon: 7.020, order: 1, type: "PICKUP" },
-                    { name: "Spibat", lat: 5.505, lon: 7.022, order: 2, type: "BOTH" },
-                    { name: "Wetheral", lat: 5.480, lon: 7.025, order: 3, type: "DROPOFF" }
                 ]
             },
             {
@@ -182,12 +160,13 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Seed Trips
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 20; i++) {
             const route = routes[Math.floor(Math.random() * routes.length)];
             const driver = drivers.length > 0 ? drivers[i % drivers.length] : null;
             const bus = buses[i % buses.length];
 
             if (driver && bus && route) {
+                // Check if trip exists to avoid dupes in seed? (Optional)
                 await prisma.trip.create({
                     data: {
                         routeId: route.id,
@@ -204,17 +183,17 @@ export async function POST(req: NextRequest) {
         // 6. Seed Tickets and Payments
         for (const p of passengers) {
             if (trips.length === 0) continue;
-            const trip = trips[Math.floor(Math.random() * trips.length)];
-            const seat = trip.bus.seats[Math.floor(Math.random() * trip.bus.seats.length)];
+            // Create a general ticket for the user
 
             try {
                 const ticket = await prisma.ticket.create({
                     data: {
                         userId: p.id,
-                        tripId: trip.id,
-                        seatId: seat.id,
+                        name: "Standard Passage",
                         price: Math.floor(Math.random() * 500) + 100,
-                        status: TicketStatus.PAID
+                        status: TicketStatus.PAID,
+                        type: TicketType.SINGLE,
+                        estimatedUsage: 5
                     }
                 });
 
@@ -228,7 +207,21 @@ export async function POST(req: NextRequest) {
                         reference: `REF-${Math.random().toString(36).substring(7).toUpperCase()}`
                     }
                 });
+
+                // Create some coverage (usage)
+                const trip = trips[Math.floor(Math.random() * trips.length)];
+                const seat = trip.bus.seats[Math.floor(Math.random() * trip.bus.seats.length)];
+
+                await prisma.ticketCoverage.create({
+                    data: {
+                        userId: p.id,
+                        ticketId: ticket.id,
+                        tripId: trip.id,
+                        seatId: seat.id
+                    }
+                });
             } catch (e) {
+                // Ignore unique constraint or other seed errors
             }
         }
 

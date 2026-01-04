@@ -67,7 +67,7 @@ export async function checkRateLimit(ip: string) {
 
 export async function verifyOtp(userId: string, otp: string) {
   const record = await prisma.otp.findFirst({
-    where: { id: userId },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   })
 
