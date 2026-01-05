@@ -120,6 +120,8 @@ model User {
   ticketCoverages TicketCoverage[]
 
   notifications Notification[]
+
+  userTrips UserTrip[]
 }
 
 //////////////////////////
@@ -250,6 +252,23 @@ model Trip {
   locations BusLocation[]
 
   ticketCoverages TicketCoverage[]
+
+  userTrips UserTrip[]
+}
+
+model UserTrip{
+  id       String @id @default(uuid())
+  tripId   String
+  userId   String
+
+  trip     Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tripId, userId])
+  @@map("userTrip")
 }
 
 //////////////////////////

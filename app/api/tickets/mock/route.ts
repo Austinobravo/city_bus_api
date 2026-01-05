@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const MockTicketSchema = z.object({
-    name: z.string().default("Mock Ticket"),
+    name: z.string().default("Student 15-Day Pass"),
     estimatedUsage: z.number().int().default(15),
     createCoverage: z.boolean().default(false),
     type: z.enum(TicketType).default(TicketType.SINGLE),
