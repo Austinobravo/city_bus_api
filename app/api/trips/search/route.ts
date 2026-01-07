@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
                 bus: true
             }
         });
-        console.log("inside try", trips)
+        // console.log("inside try", trips)
 
         // 2. If no direct match, check Stops
         if (trips.length === 0) {
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
             // Simpler: Fetch all scheduled trips and filter in memory if dataset is small.
             // Or fetch routes with stops.
 
-            const potentialTrips = await prisma.trip.findMany({
+            trips = await prisma.trip.findMany({
                 where: {
                     status: "SCHEDULED",
                     departureTime: { gte: queryDate },
@@ -91,24 +91,24 @@ export async function GET(req: NextRequest) {
                 }
             });
 
-            console.log("potential", potentialTrips)
+            // console.log("potential", potentialTrips)
 
             // Filter for end location in stops with higher order
-            trips = potentialTrips.filter(trip => {
-                const startStop = trip.route.stops.find(s => s.name.toLowerCase().includes(startLocation.toLowerCase()));
-                const endStop = trip.route.stops.find(s => s.name.toLowerCase().includes(endLocation.toLowerCase()));
+            // trips = potentialTrips.filter(trip => {
+            //     const startStop = trip.route.stops.find(s => s.name.toLowerCase().includes(startLocation.toLowerCase()));
+            //     const endStop = trip.route.stops.find(s => s.name.toLowerCase().includes(endLocation.toLowerCase()));
 
-                if (startStop && endStop && startStop.order < endStop.order) {
-                    return true;
-                }
-                // Checks matching destination as well if stop only matched start
-                if (startStop && trip.route.destination.toLowerCase().includes(endLocation.toLowerCase())) {
-                    return true;
-                }
-                return false;
-            });
+            //     if (startStop && endStop && startStop.order < endStop.order) {
+            //         return true;
+            //     }
+            //     // Checks matching destination as well if stop only matched start
+            //     if (startStop && trip.route.destination.toLowerCase().includes(endLocation.toLowerCase())) {
+            //         return true;
+            //     }
+            //     return false;
+            // });
 
-            console.log("trip near filter", trips)
+            // console.log("trip near filter", trips)
         }
 
         // 3. Filter by capacity (naive check: bus capacity. Real check: capacity - booked seats)
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
         // console.log("trips", trips)
 
         if (trips.length > 0) {
-            console.log("trips in nextresponse", trips)
+            // console.log("trips in nextresponse", trips)
             return NextResponse.json({trips});
         }
         
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
         // console.log("trips 4", trips)
         
         
-        console.log("trips outside nextresponse", trips)
+        // console.log("trips outside nextresponse", trips)
         return NextResponse.json({trips});
 
     } catch (error) {
