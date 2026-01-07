@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
     // Parse date or use now
     const queryDate = startDate ? new Date(startDate) : new Date();
 
+    console.log("start", startLocation)
+    console.log("end", endLocation)
     try {
         // 1. Find Trips matching direct Route Origin/Dest
         let trips = await prisma.trip.findMany({
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest) {
                 bus: true
             }
         });
-        // console.log("inside try", trips)
+        console.log("inside try", trips)
 
         // 2. If no direct match, check Stops
         if (trips.length === 0) {
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest) {
             //     return false;
             // });
 
-            // console.log("trip near filter", trips)
+            console.log("trip near filter", trips)
         }
 
         // 3. Filter by capacity (naive check: bus capacity. Real check: capacity - booked seats)
@@ -117,7 +119,7 @@ export async function GET(req: NextRequest) {
         // console.log("trips", trips)
 
         if (trips.length > 0) {
-            // console.log("trips in nextresponse", trips)
+            console.log("trips in nextresponse", trips)
             return NextResponse.json({trips});
         }
         
@@ -137,7 +139,7 @@ export async function GET(req: NextRequest) {
         // console.log("trips 4", trips)
         
         
-        // console.log("trips outside nextresponse", trips)
+        console.log("trips outside nextresponse", trips)
         return NextResponse.json({trips});
 
     } catch (error) {
