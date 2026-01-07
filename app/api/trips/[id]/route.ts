@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if(!id) return NextResponse.json({ message: "Trip ID is required" }, { status: 400 });
     console.log("id", id)
     try {
-        const trip = await prisma.trip.findUnique({ where: { id }, include: { route: true, bus: true, driver: true, userTrips: true } });
+        const trip = await prisma.trip.findUnique({ where: { id }, include: { route: {include:{stops: true}}, bus: true, driver: true } });
         if (!trip) {
             return NextResponse.json({ message: "Trip not found" }, { status: 404 });
         }

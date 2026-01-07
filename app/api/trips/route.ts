@@ -69,7 +69,15 @@ export async function GET(req: NextRequest) {
             include: {
                 route: true,
                 bus: true,
-                driver: { include: { user: true } }
+                driver: { include: { user: {
+                    select:{
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        role: true,
+                        phone: true
+                    }
+                } } }
             },
             orderBy: { departureTime: 'desc' }
         });
