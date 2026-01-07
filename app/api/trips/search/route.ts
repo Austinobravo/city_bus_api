@@ -109,6 +109,7 @@ export async function GET(req: NextRequest) {
         // 3. Filter by capacity (naive check: bus capacity. Real check: capacity - booked seats)
         // Ignoring granular seat bookings for this example or implement count
         // trips = trips.filter(...)
+        // console.log("trips", trips)
 
         if (trips.length > 0) {
             return NextResponse.json(trips);
