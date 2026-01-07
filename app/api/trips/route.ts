@@ -1,6 +1,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
+import z from "zod";
+
+
+const TripSchema = z.object({
+    routeId: z.string().trim().min(1, "Route is required"),
+    busId: z.string().trim().min(1, "Bus ID is required"),
+    driverId: z.string().trim().min(1, "Driver ID is required"),
+    departureTime: z.date().min(1, "departure time is required"),
+});
+
 
 /**
  * @swagger
@@ -65,6 +75,7 @@ export async function GET(req: NextRequest) {
         });
         return NextResponse.json(trips);
     } catch (error) {
+        console.log("error", error)
         return NextResponse.json({ error: "Failed to fetch trips" }, { status: 500 });
     }
 }
@@ -72,7 +83,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { routeId, busId, driverId, departureTime } = body;
+        const parsed = TripSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ message: "Invalid data", errors: parsed.error.message }, { status: 400 });
+        }
+        const { routeId, busId, driverId, departureTime } = parsed.data;
 
         const trip = await prisma.trip.create({
             data: {

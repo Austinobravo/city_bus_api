@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/prisma/prisma";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 
+
+
+
 /**
  * @swagger
  * /api/trips/{id}:
@@ -31,13 +34,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const id = (await params).id
     if(!id) return NextResponse.json({ message: "Trip ID is required" }, { status: 400 });
+    console.log("id", id)
     try {
         const trip = await prisma.trip.findUnique({ where: { id }, include: { route: true, bus: true, driver: true, userTrips: true } });
         if (!trip) {
             return NextResponse.json({ message: "Trip not found" }, { status: 404 });
         }
+        let userTrip = null;
+        if(user){
+            userTrip = await prisma.userTrip.findUnique({ where: { tripId_userId: { tripId: id, userId: user?.id as string } } });
+        }
 
-        const userTrip = await prisma.userTrip.findUnique({ where: { tripId_userId: { tripId: id, userId: user?.id as string } } });
 
         return NextResponse.json({ trip, userTrip });
     } catch (error) {

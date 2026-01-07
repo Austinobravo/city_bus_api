@@ -116,18 +116,21 @@ export async function GET(req: NextRequest) {
 
         // 4. Fallback: Suggested Logic (Return Routes matching start or end)
         // Mimicking suggested logic (Address/Location match)
-        const suggested = await prisma.route.findMany({
-            where: {
-                OR: [
-                    { origin: { contains: startLocation, mode: "insensitive" } },
-                    { destination: { contains: startLocation, mode: "insensitive" } },
-                    { stops: { some: { name: { contains: startLocation, mode: "insensitive" } } } }
-                ]
-            },
-            include: { stops: true }
-        });
+        // const suggested = await prisma.route.findMany({
+        //     where: {
+        //         OR: [
+        //             { origin: { contains: startLocation, mode: "insensitive" } },
+        //             { destination: { contains: startLocation, mode: "insensitive" } },
+        //             { stops: { some: { name: { contains: startLocation, mode: "insensitive" } } } }
+        //         ]
+        //     },
+        //     include: { stops: true }
+        // });
 
-        return NextResponse.json({ message: "No exact trips found, showing suggested routes", trips:suggested });
+        // console.log("trips 4", trips)
+
+
+        return NextResponse.json(trips);
 
     } catch (error) {
         console.error("Trip Search Error:", error);

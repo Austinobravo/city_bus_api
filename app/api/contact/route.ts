@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const ContactSchema = z.object({
     name: z.string().trim().min(1, "Name is required"),
-    email: z.string().trim().email("Invalid email"),
+    email: z.email("Invalid email").trim(),
     subject: z.string().trim().min(1, "Subject is required"),
     message: z.string().trim().min(1, "Message is required"),
 });
