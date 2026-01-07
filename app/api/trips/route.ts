@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
             },
             orderBy: { departureTime: 'desc' }
         });
-        return NextResponse.json(trips);
+        return NextResponse.json({trips});
     } catch (error) {
         console.log("error", error)
         return NextResponse.json({ error: "Failed to fetch trips" }, { status: 500 });
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        return NextResponse.json(trip, { status: 201 });
+        return NextResponse.json({trip}, { status: 201 });
     } catch (error) {
         console.error("Error creating trip:", error);
         return NextResponse.json({ error: "Failed to create trip" }, { status: 500 });

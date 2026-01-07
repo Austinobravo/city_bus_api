@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
                 bus: true
             }
         });
+        console.log("inside try", trips)
 
         // 2. If no direct match, check Stops
         if (trips.length === 0) {
@@ -90,6 +91,8 @@ export async function GET(req: NextRequest) {
                 }
             });
 
+            console.log("potential", potentialTrips)
+
             // Filter for end location in stops with higher order
             trips = potentialTrips.filter(trip => {
                 const startStop = trip.route.stops.find(s => s.name.toLowerCase().includes(startLocation.toLowerCase()));
@@ -104,6 +107,8 @@ export async function GET(req: NextRequest) {
                 }
                 return false;
             });
+
+            console.log("trip near filter", trips)
         }
 
         // 3. Filter by capacity (naive check: bus capacity. Real check: capacity - booked seats)
@@ -112,9 +117,10 @@ export async function GET(req: NextRequest) {
         // console.log("trips", trips)
 
         if (trips.length > 0) {
-            return NextResponse.json(trips);
+            console.log("trips in nextresponse", trips)
+            return NextResponse.json({trips});
         }
-
+        
         // 4. Fallback: Suggested Logic (Return Routes matching start or end)
         // Mimicking suggested logic (Address/Location match)
         // const suggested = await prisma.route.findMany({
@@ -127,11 +133,12 @@ export async function GET(req: NextRequest) {
         //     },
         //     include: { stops: true }
         // });
-
+        
         // console.log("trips 4", trips)
-
-
-        return NextResponse.json(trips);
+        
+        
+        console.log("trips outside nextresponse", trips)
+        return NextResponse.json({trips});
 
     } catch (error) {
         console.error("Trip Search Error:", error);
